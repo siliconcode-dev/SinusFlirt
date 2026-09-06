@@ -1,10 +1,12 @@
 import { AmbientBackground } from "@/components/ambient-background";
 import { BezelCard } from "@/components/bezel-card";
+import { Logo } from "@/components/logo";
 
 export default function BlockedPage() {
   return (
-    <main className="relative flex min-h-[100dvh] items-center justify-center px-4 py-16">
+    <main className="relative flex min-h-[100dvh] flex-col items-center justify-center px-4 py-16">
       <AmbientBackground />
+      <Logo className="mb-6 h-20 w-auto animate-in fade-in duration-700" />
       <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-700">
         <BezelCard>
           <h1 className="font-heading text-2xl font-semibold text-foreground sm:text-3xl">

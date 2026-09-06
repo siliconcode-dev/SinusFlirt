@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
+import { GoogleIcon } from "@/components/icons/google-icon";
 
 export function GoogleSignInButton() {
   const [loading, setLoading] = useState(false);
@@ -44,8 +45,9 @@ export function GoogleSignInButton() {
         variant="outline"
         onClick={handleClick}
         disabled={loading}
-        className="transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] active:scale-[0.98]"
+        className="gap-2 transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] active:scale-[0.98]"
       >
+        <GoogleIcon className="size-4" />
         {loading ? "Redirecting..." : "Sign in with Google to save progress"}
       </Button>
       {error && <p className="mt-2 text-sm text-destructive">{error}</p>}

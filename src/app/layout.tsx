@@ -18,8 +18,14 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://sinusflirt.vercel.app"),
   title: "SinusFlirt",
   description: "A voice-driven, anime-style AI companion.",
+  openGraph: {
+    title: "SinusFlirt",
+    description: "A voice-driven, anime-style AI companion.",
+    images: ["/brand/full-logo.png"],
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

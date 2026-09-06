@@ -1,11 +1,13 @@
 import { AmbientBackground } from "@/components/ambient-background";
 import { GoogleSignInButton } from "@/components/google-sign-in-button";
+import { Logo } from "@/components/logo";
 
 export default function Home() {
   return (
     <main className="relative flex min-h-[100dvh] flex-col items-center justify-center px-4 py-16 text-center">
       <AmbientBackground />
       <div className="max-w-lg animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <Logo className="mx-auto mb-2 h-28 w-auto" />
         <span className="mb-4 inline-block rounded-full bg-primary/10 px-3 py-1 text-[10px] font-medium tracking-[0.2em] text-primary uppercase">
           Session started
         </span>
