@@ -27,6 +27,21 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
+  // Any response we return instead of `supabaseResponse` (i.e. a redirect)
+  // must still carry whatever cookies were queued on it — otherwise a
+  // freshly-created anonymous session's cookie is silently dropped, and the
+  // next request creates yet another anonymous user instead of continuing
+  // the same one. This is what makes /blocked "sticky" across reloads.
+  function redirectTo(pathname: string) {
+    const url = request.nextUrl.clone();
+    url.pathname = pathname;
+    const response = NextResponse.redirect(url);
+    supabaseResponse.cookies.getAll().forEach((cookie) => {
+      response.cookies.set(cookie);
+    });
+    return response;
+  }
+
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -54,9 +69,7 @@ export async function updateSession(request: NextRequest) {
       // Fail closed: with no verified session we can't confirm the
       // age-gate claim, so never let the request through to app routes.
       if (isPublicPath) return supabaseResponse;
-      const url = request.nextUrl.clone();
-      url.pathname = "/age-gate";
-      return NextResponse.redirect(url);
+      return redirectTo("/age-gate");
     }
     currentUser = data.user;
   }
@@ -67,21 +80,15 @@ export async function updateSession(request: NextRequest) {
   const isUnderage = currentUser?.app_metadata?.underage === true;
 
   if (isUnderage && path !== "/blocked") {
-    const url = request.nextUrl.clone();
-    url.pathname = "/blocked";
-    return NextResponse.redirect(url);
+    return redirectTo("/blocked");
   }
 
   if (!isUnderage && !ageVerifiedAt && !isPublicPath) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/age-gate";
-    return NextResponse.redirect(url);
+    return redirectTo("/age-gate");
   }
 
   if (!isUnderage && ageVerifiedAt && path === "/age-gate") {
-    const url = request.nextUrl.clone();
-    url.pathname = "/";
-    return NextResponse.redirect(url);
+    return redirectTo("/");
   }
 
   return supabaseResponse;
