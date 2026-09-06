@@ -51,7 +51,12 @@ export async function updateSession(request: NextRequest) {
     const { data, error } = await supabase.auth.signInAnonymously();
     if (error) {
       console.error("Anonymous sign-in failed:", error.message);
-      return supabaseResponse;
+      // Fail closed: with no verified session we can't confirm the
+      // age-gate claim, so never let the request through to app routes.
+      if (isPublicPath) return supabaseResponse;
+      const url = request.nextUrl.clone();
+      url.pathname = "/age-gate";
+      return NextResponse.redirect(url);
     }
     currentUser = data.user;
   }
