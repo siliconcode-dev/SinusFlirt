@@ -4,6 +4,7 @@ import { withGroqFallback, GROQ_MODELS } from "@/lib/groq";
 import { createClient } from "@/lib/supabase/server";
 import { getAssignedCharacter } from "@/lib/characters/get-assigned-character";
 import { getToneDirective } from "@/lib/characters/tone";
+import { getMemoryDirective } from "@/lib/characters/memory";
 import { scoreTurn } from "@/lib/characters/score-turn";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
@@ -27,17 +28,29 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
-  const { character, interestScore } = assigned;
+  const { character, interestScore, memorySummary } = assigned;
 
-  // Scoring only depends on the player's message, already fully available
-  // here — no need to wait for her reply to finish streaming. `after()`
-  // keeps the serverless function alive for this after the response below
-  // is sent, run concurrently with TTS so it never adds perceived latency
-  // (same trick as Phase 3's chunk prefetching).
+  // Scoring + memory-summary rewrite only depend on the player's message and
+  // her *previous* reply — both already fully available here (the client
+  // resends full history every turn, so the prior assistant turn is already
+  // in `messages`) — no need to wait for this turn's reply to finish
+  // streaming. `after()` keeps the serverless function alive for this after
+  // the response below is sent, run concurrently with TTS so it never adds
+  // perceived latency (same trick as Phase 3's chunk prefetching).
   const lastUserMessage = [...messages].reverse().find((m) => m.role === "user");
+  const previousAssistantMessage =
+    [...messages].reverse().find((m) => m.role === "assistant")?.content ?? null;
   if (lastUserMessage) {
     after(() =>
-      scoreTurn(supabase, user.id, character, interestScore, lastUserMessage.content)
+      scoreTurn(
+        supabase,
+        user.id,
+        character,
+        interestScore,
+        memorySummary,
+        lastUserMessage.content,
+        previousAssistantMessage
+      )
     );
   }
 
@@ -50,7 +63,10 @@ export async function POST(request: Request) {
       messages: [
         {
           role: "system",
-          content: character.systemPrompt + getToneDirective(interestScore),
+          content:
+            character.systemPrompt +
+            getToneDirective(interestScore) +
+            getMemoryDirective(memorySummary),
         },
         ...messages,
       ],

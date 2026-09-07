@@ -25,6 +25,7 @@ export async function GET() {
     name: assigned.character.name,
     slug: assigned.character.slug,
     interestScore: assigned.interestScore,
+    memorySummary: assigned.memorySummary,
     ended: assigned.interestScore <= EARLY_EXIT_THRESHOLD,
   });
 }

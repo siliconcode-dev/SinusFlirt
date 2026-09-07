@@ -6,6 +6,7 @@ import type { Character } from "./types";
 export type AssignedCharacter = {
   character: Character;
   interestScore: number;
+  memorySummary: string | null;
 };
 
 /**
@@ -21,15 +22,23 @@ export async function getAssignedCharacter(
 ): Promise<AssignedCharacter | null> {
   const { data: existing } = await supabase
     .from("relationship_state")
-    .select("interest_score, characters(slug)")
+    .select("interest_score, memory_summary, characters(slug)")
     .eq("account_id", accountId)
     .eq("is_permanent", true)
-    .maybeSingle<{ interest_score: number; characters: { slug: string } }>();
+    .maybeSingle<{
+      interest_score: number;
+      memory_summary: string | null;
+      characters: { slug: string };
+    }>();
 
   if (existing) {
     const character = ROSTER[existing.characters.slug];
     if (!character) return null;
-    return { character, interestScore: existing.interest_score };
+    return {
+      character,
+      interestScore: existing.interest_score,
+      memorySummary: existing.memory_summary,
+    };
   }
 
   return assignRandomCharacter(supabase, accountId);
@@ -70,7 +79,7 @@ async function assignRandomCharacter(
 
   const character = ROSTER[pick.slug];
   if (!character) return null;
-  return { character, interestScore: 50 };
+  return { character, interestScore: 50, memorySummary: null };
 }
 
 export { FREE_SLUGS };

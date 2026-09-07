@@ -8,6 +8,10 @@ import { LatencyPanel } from "./latency-panel";
 import type { ConversationMessage, TurnLatency } from "./types";
 import { chunkForTTS } from "@/lib/tts-chunking";
 import { playChunksSequentially } from "@/lib/audio/playback-queue";
+import { createClient } from "@/lib/supabase/client";
+import { SaveProgressPrompt } from "./save-progress-prompt";
+
+const SAVE_PROMPT_TURN_THRESHOLD = 3;
 
 // WebGL can't run during SSR.
 const AvatarCanvas = dynamic(
@@ -19,6 +23,7 @@ type CharacterInfo = {
   name: string;
   slug: string;
   interestScore: number;
+  memorySummary: string | null;
   ended: boolean;
 };
 
@@ -41,12 +46,32 @@ export function VoiceLab() {
     "loading"
   );
   const [characterInfo, setCharacterInfo] = useState<CharacterInfo | null>(null);
+  const [isAnonymous, setIsAnonymous] = useState(false);
+  const [exitIntent, setExitIntent] = useState(false);
+  const [promptDismissed, setPromptDismissed] = useState(false);
 
   useEffect(() => {
     fetchCharacterInfo().then(setCharacterInfo);
+    createClient()
+      .auth.getUser()
+      .then(({ data: { user } }) => setIsAnonymous(Boolean(user?.is_anonymous)));
   }, []);
 
+  useEffect(() => {
+    if (!isAnonymous || promptDismissed) return;
+    function handleMouseLeave(e: MouseEvent) {
+      if (e.clientY <= 0) setExitIntent(true);
+    }
+    document.addEventListener("mouseleave", handleMouseLeave);
+    return () => document.removeEventListener("mouseleave", handleMouseLeave);
+  }, [isAnonymous, promptDismissed]);
+
   const name = characterInfo?.name ?? "...";
+  const playerTurns = messages.filter((m) => m.role === "user").length;
+  const showSavePrompt =
+    isAnonymous &&
+    !promptDismissed &&
+    (exitIntent || playerTurns >= SAVE_PROMPT_TURN_THRESHOLD);
 
   async function handleAudioReady(blob: Blob) {
     if (busy || !audioEl || characterInfo?.ended) return;
@@ -138,7 +163,7 @@ export function VoiceLab() {
 
   return (
     <div style={{ fontFamily: "monospace", padding: 24, maxWidth: 800 }}>
-      <h1>Voice Lab (Phase 4 — character system, plain dev chrome by design)</h1>
+      <h1>Voice Lab (Phase 5 — persistence & memory, plain dev chrome by design)</h1>
 
       <div style={{ position: "relative", width: "100%", height: 480, background: "#1a0e12" }}>
         <AvatarCanvas audio={audioEl} onStatusChange={setModelStatus} />
@@ -166,6 +191,7 @@ export function VoiceLab() {
         Character: <strong>{name}</strong> | Interest:{" "}
         <strong>{characterInfo?.interestScore ?? "..."}/100</strong>
       </p>
+      <p>Memory: {characterInfo?.memorySummary ?? "(nothing yet)"}</p>
       <p>Status: {status}</p>
 
       {characterInfo?.ended ? (
@@ -192,6 +218,13 @@ export function VoiceLab() {
 
       <h2>Latency log</h2>
       <LatencyPanel turns={latencies} />
+
+      {showSavePrompt && (
+        <SaveProgressPrompt
+          characterName={name}
+          onDismiss={() => setPromptDismissed(true)}
+        />
+      )}
     </div>
   );
 }
