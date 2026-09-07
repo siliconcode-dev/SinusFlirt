@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { Radio } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DotmTriangle2 } from "@/components/ui/dotm-triangle-2";
 import { cn } from "cn";
 import { encodeWav } from "@/lib/audio/wav-encoder";
 
@@ -74,7 +75,11 @@ export function OpenMicToggle({
       onClick={() => (active ? disable() : enable())}
       className="h-11 gap-2 px-4"
     >
-      <Radio className={cn("size-4", active && "animate-pulse")} />
+      {loading ? (
+        <DotmTriangle2 size={16} dotSize={2} colorPreset="solid-theme" ariaLabel="Loading" />
+      ) : (
+        <Radio className={cn("size-4", active && "animate-pulse")} />
+      )}
       {loading ? "Loading..." : active ? "Open mic: on" : "Open mic"}
     </Button>
   );

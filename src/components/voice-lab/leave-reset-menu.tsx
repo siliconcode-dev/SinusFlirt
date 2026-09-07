@@ -4,6 +4,7 @@ import { useState } from "react";
 import { MoreVertical, LogOut, RotateCcw, Users } from "lucide-react";
 import { CharacterPickerDialog } from "./character-picker-dialog";
 import { Button } from "@/components/ui/button";
+import { DotmSquare5 } from "@/components/ui/dotm-square-5";
 import {
   Popover,
   PopoverContent,
@@ -133,7 +134,11 @@ export function LeaveResetMenu({
               variant="destructive"
               onClick={handleConfirmReset}
               disabled={resetting}
+              className="gap-2"
             >
+              {resetting && (
+                <DotmSquare5 size={16} dotSize={2} color="currentColor" ariaLabel="Restarting" />
+              )}
               {resetting ? "Restarting..." : "Yes, restart"}
             </Button>
           </DialogFooter>

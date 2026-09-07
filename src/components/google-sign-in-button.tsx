@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { GoogleIcon } from "@/components/icons/google-icon";
+import { DotmSquare5 } from "@/components/ui/dotm-square-5";
 
 export function GoogleSignInButton() {
   const [loading, setLoading] = useState(false);
@@ -54,7 +55,11 @@ export function GoogleSignInButton() {
         disabled={loading}
         className="gap-2 transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] active:scale-[0.98]"
       >
-        <GoogleIcon className="size-4" />
+        {loading ? (
+          <DotmSquare5 size={16} dotSize={2} colorPreset="solid-theme" ariaLabel="Redirecting" />
+        ) : (
+          <GoogleIcon className="size-4" />
+        )}
         {loading ? "Redirecting..." : "Sign in with Google to save progress"}
       </Button>
       {error && <p className="mt-2 text-sm text-destructive">{error}</p>}

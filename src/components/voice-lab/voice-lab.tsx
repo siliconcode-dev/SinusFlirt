@@ -2,7 +2,10 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Heart } from "lucide-react";
+import { Heart } from "lucide-react";
+import { DotmCircular4 } from "@/components/ui/dotm-circular-4";
+import { DotmSquare12 } from "@/components/ui/dotm-square-12";
+import { Skeleton } from "@/components/ui/skeleton";
 import { PushToTalkButton } from "./push-to-talk-button";
 import { OpenMicToggle } from "./open-mic-toggle";
 import type { ConversationMessage, TurnLatency } from "./types";
@@ -110,6 +113,7 @@ export function VoiceLab() {
   );
   const [showKissCutscene, setShowKissCutscene] = useState(false);
   const [isPlayerSpeaking, setIsPlayerSpeaking] = useState(false);
+  const [thinking, setThinking] = useState(false);
   const avatarCardRef = useRef<HTMLDivElement>(null);
   const statusCardRef = useRef<HTMLDivElement>(null);
 
@@ -220,6 +224,7 @@ export function VoiceLab() {
       setMessages(messagesRef.current);
 
       setStatus(null);
+      setThinking(true);
       const chatStart = performance.now();
       const chatResult = await fetchClassified("/api/voice/chat", {
         method: "POST",
@@ -243,6 +248,7 @@ export function VoiceLab() {
           if (done) break;
           if (latency.llmTtftMs === null) {
             latency.llmTtftMs = Math.round(performance.now() - chatStart);
+            setThinking(false);
           }
           replyText += decoder.decode(value, { stream: true });
           setStatus(replyText);
@@ -283,6 +289,7 @@ export function VoiceLab() {
       console.error("[voice-lab] turn failed:", error);
       setStatus("Something went wrong — try again.");
     } finally {
+      setThinking(false);
       setLatencies((prev) => [...prev, latency]);
       setBusy(false);
     }
@@ -339,25 +346,35 @@ export function VoiceLab() {
 
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate font-heading text-lg font-semibold text-foreground">
-            {name}
-            {unlockActive && (
-              <span className="ml-2 rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-medium tracking-wide text-accent uppercase">
-                Premium
-              </span>
-            )}
-          </p>
-          {characterInfo && (
-            <div className="mt-1 flex items-center gap-2">
-              <div className="h-1.5 w-32 overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full bg-primary transition-all duration-500"
-                  style={{ width: `${characterInfo.interestScore}%` }}
-                />
+          {characterInfo ? (
+            <>
+              <p className="truncate font-heading text-lg font-semibold text-foreground">
+                {name}
+                {unlockActive && (
+                  <span className="ml-2 rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-medium tracking-wide text-accent uppercase">
+                    Premium
+                  </span>
+                )}
+              </p>
+              <div className="mt-1 flex items-center gap-2">
+                <div className="h-1.5 w-32 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-primary transition-all duration-500"
+                    style={{ width: `${characterInfo.interestScore}%` }}
+                  />
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  {characterInfo.interestScore}/100
+                </span>
               </div>
-              <span className="text-xs text-muted-foreground">
-                {characterInfo.interestScore}/100
-              </span>
+            </>
+          ) : (
+            <div className="flex flex-col gap-1.5">
+              <Skeleton className="h-6 w-24" />
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-1.5 w-32 rounded-full" />
+                <Skeleton className="h-3 w-10" />
+              </div>
             </div>
           )}
         </div>
@@ -382,20 +399,27 @@ export function VoiceLab() {
           onStatusChange={setModelStatus}
         />
         {modelStatus !== "loaded" && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-rose-200">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-rose-200">
             {modelStatus === "error" ? (
               <p className="px-6 text-center text-sm">
                 No avatar model loaded yet — drop aiko.vrm into public/models/
               </p>
             ) : (
               <>
-                <Loader2 className="size-6 animate-spin" />
+                <DotmCircular4 size={64} dotSize={6} colorPreset="solid-theme" ariaLabel="Loading avatar" />
                 <p className="text-sm">Loading avatar...</p>
               </>
             )}
           </div>
         )}
       </div>
+
+      {thinking && !status && (
+        <div className="flex items-center gap-2 px-1">
+          <DotmSquare12 size={24} dotSize={3} colorPreset="solid-theme" ariaLabel="Thinking" />
+          <span className="text-xs text-muted-foreground">{name} is thinking...</span>
+        </div>
+      )}
 
       {status && (
         <Card ref={statusCardRef}>

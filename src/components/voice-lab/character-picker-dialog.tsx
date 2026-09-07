@@ -13,6 +13,7 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { ROSTER, FREE_SLUGS, PREMIUM_SLUGS } from "@/lib/characters/roster";
+import { DotmSquare5 } from "@/components/ui/dotm-square-5";
 import { cn } from "cn";
 
 // Project-owner-directed override of the default random-only assignment
@@ -70,7 +71,10 @@ export function CharacterPickerDialog({
               >
                 Back
               </Button>
-              <Button onClick={handleConfirm} disabled={submitting}>
+              <Button onClick={handleConfirm} disabled={submitting} className="gap-2">
+                {submitting && (
+                  <DotmSquare5 size={16} dotSize={2} color="currentColor" ariaLabel="Starting" />
+                )}
                 {submitting ? "Starting..." : `Yes, meet ${pending.name}`}
               </Button>
             </DialogFooter>

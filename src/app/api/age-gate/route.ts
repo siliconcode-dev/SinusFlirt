@@ -35,7 +35,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "No session." }, { status: 401 });
   }
 
-  const dob = new Date(parsed.data.dob);
+  // Date-only strings ("1900-01-01") parse as UTC midnight per the JS spec,
+  // but calculateAge reads it back with local-time getters — a mismatch
+  // that can shift the effective date by a day near a UTC-offset boundary.
+  // Parsing the components directly and building a local Date sidesteps it.
+  const [dobYear, dobMonth, dobDay] = parsed.data.dob.split("-").map(Number);
+  const dob = new Date(dobYear!, dobMonth! - 1, dobDay);
   const now = new Date();
   const age = calculateAge(dob, now);
   const isAdult = age >= 18;
