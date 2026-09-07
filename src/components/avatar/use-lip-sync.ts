@@ -9,25 +9,30 @@ const SMOOTHING = 0.35; // lower = smoother/slower response
  * source for true viseme-accurate lip sync. This drives the "aa" viseme
  * proportionally to the currently-playing audio's real-time volume (RMS) —
  * reads as "she's talking," not claiming phoneme accuracy.
+ *
+ * Takes a caller-provided AudioContext (Phase 8) rather than creating its
+ * own — iOS Safari's AudioContext starts suspended and can only be resumed
+ * from directly inside a user-gesture handler, so the context has to be
+ * created once at a level the gesture handler (push-to-talk's onPointerDown)
+ * can also reach, not buried inside this hook's own effect.
  */
-export function useLipSync(vrm: VRM | null, audio: HTMLAudioElement | null) {
+export function useLipSync(
+  vrm: VRM | null,
+  audio: HTMLAudioElement | null,
+  audioContext: AudioContext | null
+) {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const dataRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
   const smoothedRef = useRef(0);
 
   useEffect(() => {
-    if (!audio) return;
+    if (!audio || !audioContext) return;
 
-    const AudioContextCtor =
-      window.AudioContext ||
-      (window as unknown as { webkitAudioContext: typeof AudioContext })
-        .webkitAudioContext;
-    const context = new AudioContextCtor();
-    const source = context.createMediaElementSource(audio);
-    const analyser = context.createAnalyser();
+    const source = audioContext.createMediaElementSource(audio);
+    const analyser = audioContext.createAnalyser();
     analyser.fftSize = 256;
     source.connect(analyser);
-    analyser.connect(context.destination);
+    analyser.connect(audioContext.destination);
 
     analyserRef.current = analyser;
     dataRef.current = new Uint8Array(analyser.frequencyBinCount);
@@ -35,11 +40,10 @@ export function useLipSync(vrm: VRM | null, audio: HTMLAudioElement | null) {
     return () => {
       analyser.disconnect();
       source.disconnect();
-      void context.close();
       analyserRef.current = null;
       dataRef.current = null;
     };
-  }, [audio]);
+  }, [audio, audioContext]);
 
   useFrame(() => {
     if (!vrm) return;

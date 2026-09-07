@@ -124,7 +124,7 @@ export function KissCutscene({
   }, [reactionLine, onComplete]);
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 60, background: "#1a0e12" }}>
+    <div className="fixed inset-0 z-[60] bg-[#1a0e12]">
       <Canvas
         camera={{ position: [0, 1.4, 1.9], fov: 30 }}
         onCreated={({ camera }) => camera.lookAt(0, 1.3, 0)}
@@ -135,13 +135,9 @@ export function KissCutscene({
         {playerAvailable && <LeaningAvatar vrm={playerVrm} side="right" />}
       </Canvas>
       <div
+        className="pointer-events-none absolute inset-0 bg-white transition-opacity duration-700 ease-out"
         style={{
-          position: "absolute",
-          inset: 0,
-          background: "#fff",
           opacity: flash ? 1 : 0,
-          transition: "opacity 0.7s ease-out",
-          pointerEvents: "none",
         }}
       />
     </div>

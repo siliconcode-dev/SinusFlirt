@@ -11,11 +11,13 @@ import { useLipSync } from "./use-lip-sync";
 export function VrmAvatar({
   url,
   audio,
+  audioContext,
   interestScore = null,
   onStatusChange,
 }: {
   url: string;
   audio: HTMLAudioElement | null;
+  audioContext: AudioContext | null;
   interestScore?: number | null;
   onStatusChange?: (status: "loading" | "loaded" | "error") => void;
 }) {
@@ -60,7 +62,7 @@ export function VrmAvatar({
 
   useIdleAnimation(vrm);
   useBodyGesture(vrm, interestScore);
-  useLipSync(vrm, audio);
+  useLipSync(vrm, audio, audioContext);
 
   useFrame((_, delta) => {
     vrm?.update(delta);

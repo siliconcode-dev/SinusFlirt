@@ -1,6 +1,9 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { Radio } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "cn";
 import { encodeWav } from "@/lib/audio/wav-encoder";
 
 // Pinned to the installed package versions (see package.json) so the CDN
@@ -10,9 +13,11 @@ const ORT_WASM_BASE = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.29.0/dist/
 
 export function OpenMicToggle({
   disabled,
+  audioContext,
   onAudioReady,
 }: {
   disabled?: boolean;
+  audioContext?: AudioContext | null;
   onAudioReady: (blob: Blob) => void;
 }) {
   const [active, setActive] = useState(false);
@@ -21,6 +26,9 @@ export function OpenMicToggle({
   const vadRef = useRef<any>(null);
 
   async function enable() {
+    if (audioContext?.state === "suspended") {
+      audioContext.resume().catch(() => {});
+    }
     setLoading(true);
     try {
       const { MicVAD } = await import("@ricky0123/vad-web");
@@ -49,24 +57,15 @@ export function OpenMicToggle({
   }
 
   return (
-    <button
+    <Button
+      type="button"
+      variant={active ? "default" : "outline"}
       disabled={disabled || loading}
       onClick={() => (active ? disable() : enable())}
-      style={{
-        padding: "12px 20px",
-        fontSize: 14,
-        background: active ? "#0a0" : "#555",
-        color: "#fff",
-        border: "none",
-        borderRadius: 4,
-        cursor: disabled ? "not-allowed" : "pointer",
-      }}
+      className="h-11 gap-2 px-4"
     >
-      {loading
-        ? "Loading VAD..."
-        : active
-          ? "Open mic: ON (click to stop)"
-          : "Open mic: OFF (click to start)"}
-    </button>
+      <Radio className={cn("size-4", active && "animate-pulse")} />
+      {loading ? "Loading..." : active ? "Open mic: on" : "Open mic"}
+    </Button>
   );
 }

@@ -2,15 +2,18 @@
 
 import { Canvas } from "@react-three/fiber";
 import { VrmAvatar } from "./vrm-avatar";
+import { CameraDrift } from "./camera-drift";
 
 const MODEL_URL = "/models/aiko.vrm";
 
 export function AvatarCanvas({
   audio,
+  audioContext,
   interestScore = null,
   onStatusChange,
 }: {
   audio: HTMLAudioElement | null;
+  audioContext: AudioContext | null;
   interestScore?: number | null;
   onStatusChange?: (status: "loading" | "loaded" | "error") => void;
 }) {
@@ -28,9 +31,11 @@ export function AvatarCanvas({
       <directionalLight position={[-1.5, 1, 0.5]} intensity={0.5} color="#eef2ff" />
       <directionalLight position={[0, 1.6, -1.8]} intensity={0.6} color="#93c5fd" />
 
+      <CameraDrift />
       <VrmAvatar
         url={MODEL_URL}
         audio={audio}
+        audioContext={audioContext}
         interestScore={interestScore}
         onStatusChange={onStatusChange}
       />
