@@ -13,11 +13,11 @@ async function fetchChunkAudio(text: string): Promise<{ url: string; ms: number 
   return { url: URL.createObjectURL(blob), ms };
 }
 
-function playAudio(url: string): Promise<void> {
+function playOnElement(audio: HTMLAudioElement, url: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    const audio = new Audio(url);
     audio.onended = () => resolve();
     audio.onerror = () => reject(new Error("Audio playback failed"));
+    audio.src = url;
     void audio.play().catch(reject);
   });
 }
@@ -26,8 +26,15 @@ function playAudio(url: string): Promise<void> {
  * Since Orpheus's 200-char cap forces multiple sequential TTS calls per
  * reply, this prefetches chunk i+1's audio while chunk i is still playing —
  * so playback reads as one continuous voice instead of gapped clips.
+ *
+ * Takes a caller-provided `<audio>` element (reused across every chunk of a
+ * turn, `.src` swapped each time) rather than creating one per chunk — this
+ * is what lets Phase 3's lip-sync analyser stay connected to one stable
+ * `MediaElementAudioSourceNode` for a whole reply instead of rewiring per
+ * chunk (a media element can only ever be attached to one such node).
  */
 export async function playChunksSequentially(
+  audio: HTMLAudioElement,
   chunks: string[],
   onChunkTiming: (timing: ChunkTiming) => void
 ): Promise<void> {
@@ -43,7 +50,10 @@ export async function playChunksSequentially(
       nextPromise = fetchChunkAudio(chunks[i + 1]);
     }
 
-    await playAudio(url);
-    URL.revokeObjectURL(url);
+    const previousUrl = audio.src;
+    await playOnElement(audio, url);
+    if (previousUrl.startsWith("blob:")) URL.revokeObjectURL(previousUrl);
   }
+
+  if (audio.src.startsWith("blob:")) URL.revokeObjectURL(audio.src);
 }

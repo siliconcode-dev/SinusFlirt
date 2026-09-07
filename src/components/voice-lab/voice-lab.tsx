@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useRef, useState } from "react";
 import { PushToTalkButton } from "./push-to-talk-button";
 import { OpenMicToggle } from "./open-mic-toggle";
@@ -8,15 +9,27 @@ import type { ConversationMessage, TurnLatency } from "./types";
 import { chunkForTTS } from "@/lib/tts-chunking";
 import { playChunksSequentially } from "@/lib/audio/playback-queue";
 
+// WebGL can't run during SSR.
+const AvatarCanvas = dynamic(
+  () => import("@/components/avatar/avatar-canvas").then((m) => m.AvatarCanvas),
+  { ssr: false }
+);
+
 export function VoiceLab() {
   const messagesRef = useRef<ConversationMessage[]>([]);
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [latencies, setLatencies] = useState<TurnLatency[]>([]);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("Idle.");
+  const [audioEl] = useState<HTMLAudioElement | null>(() =>
+    typeof window !== "undefined" ? new Audio() : null
+  );
+  const [modelStatus, setModelStatus] = useState<"loading" | "loaded" | "error">(
+    "loading"
+  );
 
   async function handleAudioReady(blob: Blob) {
-    if (busy) return;
+    if (busy || !audioEl) return;
     setBusy(true);
     const turn = messagesRef.current.filter((m) => m.role === "user").length + 1;
     const latency: TurnLatency = {
@@ -86,7 +99,7 @@ export function VoiceLab() {
       const ttsChunks = chunkForTTS(replyText);
       latency.ttsChunkCount = ttsChunks.length;
       const ttsStart = performance.now();
-      await playChunksSequentially(ttsChunks, () => {});
+      await playChunksSequentially(audioEl, ttsChunks, () => {});
       latency.ttsTotalMs = Math.round(performance.now() - ttsStart);
 
       setStatus(`Aiko: ${replyText}`);
@@ -101,7 +114,30 @@ export function VoiceLab() {
 
   return (
     <div style={{ fontFamily: "monospace", padding: 24, maxWidth: 800 }}>
-      <h1>Voice Lab (Phase 2 — plain/ugly by design)</h1>
+      <h1>Voice Lab (Phase 3 — avatar + lip sync, plain dev chrome by design)</h1>
+
+      <div style={{ position: "relative", width: "100%", height: 480, background: "#1a0e12" }}>
+        <AvatarCanvas audio={audioEl} onStatusChange={setModelStatus} />
+        {modelStatus !== "loaded" && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#fecdd3",
+              fontSize: 14,
+              pointerEvents: "none",
+            }}
+          >
+            {modelStatus === "error"
+              ? "No avatar model loaded yet — drop aiko.vrm into public/models/"
+              : "Loading avatar..."}
+          </div>
+        )}
+      </div>
+
       <p>Status: {status}</p>
 
       <div style={{ display: "flex", gap: 12, margin: "16px 0" }}>
