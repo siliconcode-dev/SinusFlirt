@@ -45,6 +45,7 @@ function clamp(value: number, min: number, max: number): number {
 export async function scoreTurn(
   supabase: SupabaseClient,
   accountId: string,
+  characterId: string,
   character: Character,
   currentScore: number,
   previousSummary: string | null,
@@ -93,11 +94,14 @@ export async function scoreTurn(
       update.memory_summary = parsed.memorySummary.trim();
     }
 
+    // Matches on the resolved character's row directly (not is_permanent)
+    // so this works for both the permanent free companion and an active
+    // Phase 7 premium unlock alike.
     const { error } = await supabase
       .from("relationship_state")
       .update(update)
       .eq("account_id", accountId)
-      .eq("is_permanent", true);
+      .eq("character_id", characterId);
 
     if (error) {
       console.error("[score-turn] failed to persist score:", error);

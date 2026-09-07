@@ -9,6 +9,7 @@ import { scoreTurn } from "@/lib/characters/score-turn";
 import { moderateSentence } from "@/lib/moderation";
 import { splitSentences } from "@/lib/sentence-split";
 import { pickDeflectionLine } from "@/lib/characters/interruption-lines";
+import { checkUsageCap, incrementUsage } from "@/lib/monetization/usage-cap";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
@@ -31,7 +32,16 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
-  const { character, interestScore, memorySummary } = assigned;
+  const { character, characterId, interestScore, memorySummary, premiumUnlockExpiresAt } =
+    assigned;
+
+  // Phase 7: free-tier daily turn limit, lifted entirely while a premium
+  // unlock is active (Masterdoc §8 — "higher usage caps"). Checked
+  // synchronously (single lightweight read) before doing anything else.
+  const usage = await checkUsageCap(supabase, user.id, premiumUnlockExpiresAt !== null);
+  if (!usage.allowed) {
+    return NextResponse.json({ error: "usage-cap" }, { status: 429 });
+  }
 
   // Scoring + memory-summary rewrite only depend on the player's message and
   // her *previous* reply — both already fully available here (the client
@@ -48,6 +58,7 @@ export async function POST(request: Request) {
       scoreTurn(
         supabase,
         user.id,
+        characterId,
         character,
         interestScore,
         memorySummary,
@@ -56,6 +67,7 @@ export async function POST(request: Request) {
       )
     );
   }
+  after(() => incrementUsage(supabase, user.id));
 
   const start = performance.now();
   let firstTokenMs: number | null = null;

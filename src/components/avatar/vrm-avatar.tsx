@@ -5,15 +5,18 @@ import { useFrame } from "@react-three/fiber";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { VRMLoaderPlugin, VRMUtils, type VRM } from "@pixiv/three-vrm";
 import { useIdleAnimation } from "./use-idle-animation";
+import { useBodyGesture } from "./use-body-gesture";
 import { useLipSync } from "./use-lip-sync";
 
 export function VrmAvatar({
   url,
   audio,
+  interestScore = null,
   onStatusChange,
 }: {
   url: string;
   audio: HTMLAudioElement | null;
+  interestScore?: number | null;
   onStatusChange?: (status: "loading" | "loaded" | "error") => void;
 }) {
   const [vrm, setVrm] = useState<VRM | null>(null);
@@ -56,6 +59,7 @@ export function VrmAvatar({
   }, [url, onStatusChange]);
 
   useIdleAnimation(vrm);
+  useBodyGesture(vrm, interestScore);
   useLipSync(vrm, audio);
 
   useFrame((_, delta) => {

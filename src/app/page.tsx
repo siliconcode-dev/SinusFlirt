@@ -1,6 +1,11 @@
+import Link from "next/link";
 import { AmbientBackground } from "@/components/ambient-background";
 import { GoogleSignInButton } from "@/components/google-sign-in-button";
 import { Logo } from "@/components/logo";
+import { Button } from "@/components/ui/button";
+import { AdsterraNativeBanner } from "@/components/ads/adsterra-native-banner";
+import { AdsterraSocialBar } from "@/components/ads/adsterra-social-bar";
+import { AdsterraBanner300x250 } from "@/components/ads/adsterra-banner-300x250";
 
 export default function Home() {
   return (
@@ -15,16 +20,23 @@ export default function Home() {
           You&apos;re in.
         </h1>
         <p className="mt-4 text-base text-muted-foreground">
-          Your anonymous session is live. The actual voice conversation with
-          your companion ships in the next build phase — for now, this
-          confirms the foundation works: age-gate, session, and sign-in.
+          Your anonymous session is live and your companion is waiting.
         </p>
         <div className="mt-8 flex flex-col items-center gap-4">
+          <Button asChild size="lg">
+            <Link href="/voice-lab">Start talking</Link>
+          </Button>
           <GoogleSignInButton />
           <p className="text-xs text-muted-foreground">
-            Optional — without signing in, your session is remembered for
+            Sign-in is optional — without it, your session is remembered for
             48 hours only.
           </p>
+        </div>
+        <div className="mt-10">
+          <AdsterraNativeBanner />
+        </div>
+        <div className="mt-6 flex justify-center">
+          <AdsterraBanner300x250 />
         </div>
       </div>
       <footer className="absolute bottom-6 flex gap-4 text-xs text-muted-foreground">
@@ -35,6 +47,7 @@ export default function Home() {
           Privacy
         </a>
       </footer>
+      <AdsterraSocialBar />
     </main>
   );
 }

@@ -3,6 +3,10 @@
 // back up (see src/lib/characters/get-assigned-character.ts).
 export const EARLY_EXIT_THRESHOLD = 10;
 
+// Masterdoc §5.2: "crossing a high threshold unlocks the kiss cutscene as
+// an available action" — a button becomes available, not an automatic cut.
+export const KISS_THRESHOLD = 90;
+
 /**
  * Maps the 0-100 interest score to a short instruction appended to the
  * character's base system prompt each turn, so her warmth visibly tracks

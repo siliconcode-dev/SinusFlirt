@@ -18,10 +18,13 @@ import {
 } from "@/lib/audio/web-speech-fallback";
 import { InterruptionOverlay, type InterruptionKind } from "./interruption-overlay";
 import { MicBlockedScreen } from "./mic-blocked-screen";
+import { KissCutscene } from "@/components/avatar/kiss-cutscene";
+import { getKissLine } from "@/lib/characters/kiss-lines";
 
 const SAVE_PROMPT_TURN_THRESHOLD = 3;
+const MOBILE_QUERY = "(pointer: coarse)";
 
-type FetchClassification = Response | "cap" | "outage";
+type FetchClassification = Response | "cap" | "outage" | "usage-cap";
 
 // Wraps a fetch with the "quick silent reconnect" retry, and classifies a
 // non-ok HTTP response the same way the server does (cap/outage) so callers
@@ -34,7 +37,8 @@ async function fetchClassified(
     const res = await withRetry(() => fetch(input, init));
     if (res.ok) return res;
     const body = (await res.json().catch(() => ({}))) as { error?: string };
-    return body.error === "cap" ? "cap" : "outage";
+    if (body.error === "cap" || body.error === "usage-cap") return body.error;
+    return "outage";
   } catch {
     return "outage";
   }
@@ -52,6 +56,10 @@ type CharacterInfo = {
   interestScore: number;
   memorySummary: string | null;
   ended: boolean;
+  kissAvailable: boolean;
+  premiumUnlockExpiresAt: string | null;
+  isAnonymous: boolean;
+  usage: { turnsUsedToday: number; dailyCap: number | null };
 };
 
 async function fetchCharacterInfo(): Promise<CharacterInfo | null> {
@@ -78,6 +86,17 @@ export function VoiceLab() {
   const [promptDismissed, setPromptDismissed] = useState(false);
   const [micDenied, setMicDenied] = useState(false);
   const [interruption, setInterruption] = useState<InterruptionKind | null>(null);
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia(MOBILE_QUERY).matches : false
+  );
+  const [showKissCutscene, setShowKissCutscene] = useState(false);
+
+  useEffect(() => {
+    const mql = window.matchMedia(MOBILE_QUERY);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mql.addEventListener("change", handler);
+    return () => mql.removeEventListener("change", handler);
+  }, []);
 
   useEffect(() => {
     fetchCharacterInfo().then(setCharacterInfo);
@@ -245,16 +264,53 @@ export function VoiceLab() {
     }
   }
 
+  async function handleUnlock() {
+    try {
+      const res = await fetch("/api/monetization/unlock", { method: "POST" });
+      if (res.ok) {
+        setInterruption(null);
+        fetchCharacterInfo().then(setCharacterInfo);
+      }
+    } catch (error) {
+      console.error("[voice-lab] unlock failed:", error);
+    }
+  }
+
   if (micDenied) {
     return <MicBlockedScreen />;
   }
 
-  return (
-    <div style={{ fontFamily: "monospace", padding: 24, maxWidth: 800 }}>
-      <h1>Voice Lab (Phase 6 — safety, moderation & failure states, plain dev chrome by design)</h1>
+  const dailyCap = characterInfo?.usage.dailyCap;
+  const unlockActive = Boolean(characterInfo?.premiumUnlockExpiresAt);
 
-      <div style={{ position: "relative", width: "100%", height: 480, background: "#1a0e12" }}>
-        <AvatarCanvas audio={audioEl} onStatusChange={setModelStatus} />
+  return (
+    <div
+      style={{
+        fontFamily: "monospace",
+        padding: "16px",
+        maxWidth: "min(800px, 100%)",
+        margin: "0 auto",
+        boxSizing: "border-box",
+      }}
+    >
+      <h1 style={{ fontSize: "min(20px, 5vw)" }}>
+        Voice Lab (Phase 7 — animation, kiss cutscene, monetization, plain dev
+        chrome by design)
+      </h1>
+
+      <div
+        style={{
+          position: "relative",
+          width: "100%",
+          height: "min(480px, 60vh)",
+          background: "#1a0e12",
+        }}
+      >
+        <AvatarCanvas
+          audio={audioEl}
+          interestScore={characterInfo?.interestScore ?? null}
+          onStatusChange={setModelStatus}
+        />
         {modelStatus !== "loaded" && (
           <div
             style={{
@@ -276,11 +332,18 @@ export function VoiceLab() {
       </div>
 
       <p>
-        Character: <strong>{name}</strong> | Interest:{" "}
+        Character: <strong>{name}</strong>
+        {unlockActive && " (premium unlock)"} | Interest:{" "}
         <strong>{characterInfo?.interestScore ?? "..."}/100</strong>
       </p>
       <p>Memory: {characterInfo?.memorySummary ?? "(nothing yet)"}</p>
-      <p>Status: {status}</p>
+      <p>
+        Usage today:{" "}
+        {dailyCap === null
+          ? "unlimited (premium unlock active)"
+          : `${characterInfo?.usage.turnsUsedToday ?? 0}/${dailyCap ?? "..."}`}
+      </p>
+      <p style={{ wordBreak: "break-word" }}>Status: {status}</p>
 
       {characterInfo?.ended ? (
         <p style={{ color: "#c00", fontWeight: "bold" }}>
@@ -289,23 +352,45 @@ export function VoiceLab() {
           time with better conversation.
         </p>
       ) : (
-        <div style={{ display: "flex", gap: 12, margin: "16px 0" }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 12, margin: "16px 0" }}>
           <PushToTalkButton disabled={busy || !!interruption} onAudioReady={handleAudioReady} />
-          <OpenMicToggle disabled={busy || !!interruption} onAudioReady={handleAudioReady} />
+          {!isMobile && (
+            <OpenMicToggle disabled={busy || !!interruption} onAudioReady={handleAudioReady} />
+          )}
+          {characterInfo?.kissAvailable && (
+            <button
+              type="button"
+              disabled={busy || !!interruption}
+              onClick={() => setShowKissCutscene(true)}
+              style={{
+                padding: "12px 20px",
+                fontSize: 14,
+                background: "#be185d",
+                color: "#fff",
+                border: "none",
+                borderRadius: 4,
+                cursor: "pointer",
+              }}
+            >
+              Kiss her
+            </button>
+          )}
         </div>
       )}
 
       <h2>Conversation</h2>
-      <ul>
+      <ul style={{ paddingLeft: 20 }}>
         {messages.map((m, i) => (
-          <li key={i}>
+          <li key={i} style={{ wordBreak: "break-word" }}>
             <strong>{m.role}:</strong> {m.content}
           </li>
         ))}
       </ul>
 
       <h2>Latency log</h2>
-      <LatencyPanel turns={latencies} />
+      <div style={{ overflowX: "auto" }}>
+        <LatencyPanel turns={latencies} />
+      </div>
 
       {showSavePrompt && (
         <SaveProgressPrompt
@@ -315,7 +400,19 @@ export function VoiceLab() {
       )}
 
       {interruption && (
-        <InterruptionOverlay kind={interruption} onRetry={() => setInterruption(null)} />
+        <InterruptionOverlay
+          kind={interruption}
+          onRetry={() => setInterruption(null)}
+          onUnlock={handleUnlock}
+          isAnonymous={isAnonymous}
+        />
+      )}
+
+      {showKissCutscene && characterInfo && (
+        <KissCutscene
+          reactionLine={getKissLine(characterInfo.slug)}
+          onComplete={() => setShowKissCutscene(false)}
+        />
       )}
     </div>
   );

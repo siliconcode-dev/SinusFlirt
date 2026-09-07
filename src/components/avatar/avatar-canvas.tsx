@@ -7,14 +7,17 @@ const MODEL_URL = "/models/aiko.vrm";
 
 export function AvatarCanvas({
   audio,
+  interestScore = null,
   onStatusChange,
 }: {
   audio: HTMLAudioElement | null;
+  interestScore?: number | null;
   onStatusChange?: (status: "loading" | "loaded" | "error") => void;
 }) {
   return (
     <Canvas
       gl={{ alpha: true }}
+      dpr={[1, 2]}
       camera={{ position: [0, 1.4, 1.6], fov: 30 }}
       onCreated={({ camera }) => camera.lookAt(0, 1.3, 0)}
     >
@@ -25,7 +28,12 @@ export function AvatarCanvas({
       <directionalLight position={[-1.5, 1, 0.5]} intensity={0.5} color="#eef2ff" />
       <directionalLight position={[0, 1.6, -1.8]} intensity={0.6} color="#93c5fd" />
 
-      <VrmAvatar url={MODEL_URL} audio={audio} onStatusChange={onStatusChange} />
+      <VrmAvatar
+        url={MODEL_URL}
+        audio={audio}
+        interestScore={interestScore}
+        onStatusChange={onStatusChange}
+      />
     </Canvas>
   );
 }
