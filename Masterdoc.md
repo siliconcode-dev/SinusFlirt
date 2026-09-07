@@ -215,6 +215,22 @@ writing rather than a fully unique voice each.
 - Premium: the other 5 characters + higher usage caps, unlocked temporarily by
   watching a Google AdSense **Rewarded Ad** — this is the correct product for a
   website (AdMob is native-app-only and doesn't apply here).
+  **Staged exception, decided 2026-09-07**: AdSense site verification is
+  pending (3-4 weeks per the project owner's region). **Adsterra** is
+  registered as a temporary provisional network for the beta in the
+  meantime, under two hard constraints: (1) Adsterra's per-site **"Adult
+  ads" toggle must stay OFF** — non-negotiable, this is the only reason
+  Adsterra is acceptable at all given Claude.md rule #1; (2) Adsterra has no
+  confirmed Rewarded Video ad unit, so **the actual watch-to-unlock mechanic
+  described below cannot be built on Adsterra as specified** — whatever
+  ships during this window (e.g. a Native Banner/Social Bar placement) is a
+  placeholder, not the real premium-unlock feature. Popunder is excluded
+  entirely (disruptive UX, mismatched with the "bright, convention-anime,
+  polished" direction). Revert to AdSense once verification clears, and
+  build the actual rewarded-unlock mechanic against AdSense then — don't
+  let a Popunder/interstitial substitute silently become the permanent
+  implementation. Site registered under category "Social" (chosen honestly,
+  not to maximize CPM).
 - Unlock duration is time-windowed (minutes/hours/days — exact number TBD in
   build). Tracked per Google account, not per browser/device.
 - Remaining unlocked time persists if the user closes the tab and returns.

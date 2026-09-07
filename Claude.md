@@ -48,7 +48,10 @@ separate from VRM skeletal animation) · Tailwind · Groq (STT: Whisper Large v3
 Turbo, LLM: current open-weight offering, TTS: Orpheus, Moderation:
 `openai/gpt-oss-safeguard-20b`) · Supabase (Postgres + Auth + `pg_cron`) ·
 Vercel (hosting + free Web Analytics) · Google AdSense Rewarded Ads (not
-AdMob — AdMob is native-app-only) · Sentry (free tier) · GitHub.
+AdMob — AdMob is native-app-only; **temporarily Adsterra while AdSense
+verification is pending, staged exception in Masterdoc §8 — Adult ads
+toggle must stay OFF, no Popunder, not the final integration**) · Sentry
+(free tier) · GitHub.
 
 Full reasoning for every choice is in Masterdoc §4 — read it before proposing
 a stack change, since several of these were picked specifically to avoid
