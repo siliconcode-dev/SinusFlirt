@@ -1,13 +1,28 @@
+import { withRetry } from "@/lib/network/with-retry";
+
 export type ChunkTiming = { text: string; ms: number };
+
+export class TTSRequestError extends Error {
+  kind: "cap" | "outage";
+  constructor(kind: "cap" | "outage") {
+    super("TTS request failed");
+    this.kind = kind;
+  }
+}
 
 async function fetchChunkAudio(text: string): Promise<{ url: string; ms: number }> {
   const start = performance.now();
-  const res = await fetch("/api/voice/speak", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text }),
-  });
-  if (!res.ok) throw new Error("TTS request failed");
+  const res = await withRetry(() =>
+    fetch("/api/voice/speak", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    })
+  );
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new TTSRequestError(body.error === "cap" ? "cap" : "outage");
+  }
   const blob = await res.blob();
   const ms = Math.round(performance.now() - start);
   return { url: URL.createObjectURL(blob), ms };

@@ -5,6 +5,7 @@ export const GROQ_MODELS = {
   stt: "whisper-large-v3-turbo",
   chat: "openai/gpt-oss-120b",
   tts: "canopylabs/orpheus-v1-english",
+  moderation: "openai/gpt-oss-safeguard-20b",
 } as const;
 
 // Same Groq account/tier, multiple keys issued for regional-fallback
@@ -19,6 +20,8 @@ const API_KEYS = [
   process.env.GROQ_API_KEY_2,
   process.env.GROQ_API_KEY_3,
   process.env.GROQ_API_KEY_4,
+  process.env.GROQ_API_KEY_5,
+  process.env.GROQ_API_KEY_6,
 ].filter((key): key is string => Boolean(key));
 
 const clients = API_KEYS.map((apiKey) => new Groq({ apiKey }));
@@ -56,4 +59,18 @@ export async function withGroqFallback<T>(
   }
 
   throw lastError;
+}
+
+/**
+ * Maps a thrown error from a `withGroqFallback` call to one of Phase 6's two
+ * interruption triggers (Build_plan.md Phase 6): a 429 means the account's
+ * quota is exhausted for now ("cap"), anything else (5xx, network failure,
+ * misconfig) means Groq itself is unreachable ("outage"). Daily (RPD) limits
+ * aren't exposed in Groq's rate-limit headers, so a 429 is treated as "cap"
+ * regardless of whether it's a true daily exhaustion or a burst RPM/TPM hit —
+ * there's no way to tell them apart from here.
+ */
+export function classifyGroqError(error: unknown): "cap" | "outage" {
+  if (error instanceof Groq.APIError && error.status === 429) return "cap";
+  return "outage";
 }

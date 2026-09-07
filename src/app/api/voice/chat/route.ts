@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import { after } from "next/server";
-import { withGroqFallback, GROQ_MODELS } from "@/lib/groq";
+import { withGroqFallback, GROQ_MODELS, classifyGroqError } from "@/lib/groq";
 import { createClient } from "@/lib/supabase/server";
 import { getAssignedCharacter } from "@/lib/characters/get-assigned-character";
 import { getToneDirective } from "@/lib/characters/tone";
 import { getMemoryDirective } from "@/lib/characters/memory";
 import { scoreTurn } from "@/lib/characters/score-turn";
+import { moderateSentence } from "@/lib/moderation";
+import { splitSentences } from "@/lib/sentence-split";
+import { pickDeflectionLine } from "@/lib/characters/interruption-lines";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
@@ -57,37 +60,73 @@ export async function POST(request: Request) {
   const start = performance.now();
   let firstTokenMs: number | null = null;
 
-  const stream = await withGroqFallback((client) =>
-    client.chat.completions.create({
-      model: GROQ_MODELS.chat,
-      messages: [
-        {
-          role: "system",
-          content:
-            character.systemPrompt +
-            getToneDirective(interestScore) +
-            getMemoryDirective(memorySummary),
-        },
-        ...messages,
-      ],
-      stream: true,
-    })
-  );
+  let stream;
+  try {
+    stream = await withGroqFallback((client) =>
+      client.chat.completions.create({
+        model: GROQ_MODELS.chat,
+        messages: [
+          {
+            role: "system",
+            content:
+              character.systemPrompt +
+              getToneDirective(interestScore) +
+              getMemoryDirective(memorySummary),
+          },
+          ...messages,
+        ],
+        stream: true,
+      })
+    );
+  } catch (error) {
+    console.error("[voice/chat] failed to start stream:", error);
+    const kind = classifyGroqError(error);
+    return NextResponse.json({ error: kind }, { status: kind === "cap" ? 429 : 503 });
+  }
 
   const encoder = new TextEncoder();
 
+  // Every sentence is moderated (Masterdoc §9/§6, Claude.md rule #2) before
+  // it ever reaches the client — this is the one choke point both the
+  // on-screen caption and the eventual TTS input pass through, since the
+  // client just displays whatever text this stream sends it. A flagged
+  // sentence is replaced with an in-character deflection line and ends the
+  // turn there; moderateSentence() itself fails closed on error.
   const body = new ReadableStream({
     async start(controller) {
+      let buffer = "";
+      let stopped = false;
+
+      async function flushSentences(finalFlush: boolean) {
+        if (!buffer.trim()) return;
+        if (!finalFlush && !/[.!?]\s*$/.test(buffer)) return;
+
+        const sentences = splitSentences(buffer);
+        buffer = "";
+        for (const sentence of sentences) {
+          const flagged = await moderateSentence(sentence);
+          if (flagged) {
+            controller.enqueue(encoder.encode(pickDeflectionLine()));
+            stopped = true;
+            return;
+          }
+          controller.enqueue(encoder.encode(sentence + " "));
+        }
+      }
+
       try {
         for await (const chunk of stream) {
+          if (stopped) break;
           const token = chunk.choices[0]?.delta?.content ?? "";
           if (!token) continue;
           if (firstTokenMs === null) {
             firstTokenMs = Math.round(performance.now() - start);
             console.log(`[voice/chat] time-to-first-token ${firstTokenMs}ms`);
           }
-          controller.enqueue(encoder.encode(token));
+          buffer += token;
+          await flushSentences(false);
         }
+        if (!stopped) await flushSentences(true);
       } catch (error) {
         console.error("[voice/chat] stream failed:", error);
       } finally {

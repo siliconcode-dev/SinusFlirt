@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { withGroqFallback, GROQ_MODELS } from "@/lib/groq";
+import { withGroqFallback, GROQ_MODELS, classifyGroqError } from "@/lib/groq";
 
 export async function POST(request: Request) {
   const start = performance.now();
@@ -26,9 +26,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ text: transcription.text, ms });
   } catch (error) {
     console.error("[voice/transcribe] failed:", error);
-    return NextResponse.json(
-      { error: "Transcription failed." },
-      { status: 502 }
-    );
+    const kind = classifyGroqError(error);
+    return NextResponse.json({ error: kind }, { status: kind === "cap" ? 429 : 503 });
   }
 }

@@ -7,11 +7,38 @@ import { OpenMicToggle } from "./open-mic-toggle";
 import { LatencyPanel } from "./latency-panel";
 import type { ConversationMessage, TurnLatency } from "./types";
 import { chunkForTTS } from "@/lib/tts-chunking";
-import { playChunksSequentially } from "@/lib/audio/playback-queue";
+import { playChunksSequentially, TTSRequestError } from "@/lib/audio/playback-queue";
 import { createClient } from "@/lib/supabase/client";
 import { SaveProgressPrompt } from "./save-progress-prompt";
+import { withRetry } from "@/lib/network/with-retry";
+import {
+  isWebSpeechSTTAvailable,
+  transcribeViaWebSpeech,
+  speakViaWebSpeech,
+} from "@/lib/audio/web-speech-fallback";
+import { InterruptionOverlay, type InterruptionKind } from "./interruption-overlay";
+import { MicBlockedScreen } from "./mic-blocked-screen";
 
 const SAVE_PROMPT_TURN_THRESHOLD = 3;
+
+type FetchClassification = Response | "cap" | "outage";
+
+// Wraps a fetch with the "quick silent reconnect" retry, and classifies a
+// non-ok HTTP response the same way the server does (cap/outage) so callers
+// can decide whether to fall back or interrupt — see Phase 6 plan.
+async function fetchClassified(
+  input: string,
+  init?: RequestInit
+): Promise<FetchClassification> {
+  try {
+    const res = await withRetry(() => fetch(input, init));
+    if (res.ok) return res;
+    const body = (await res.json().catch(() => ({}))) as { error?: string };
+    return body.error === "cap" ? "cap" : "outage";
+  } catch {
+    return "outage";
+  }
+}
 
 // WebGL can't run during SSR.
 const AvatarCanvas = dynamic(
@@ -49,12 +76,31 @@ export function VoiceLab() {
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [exitIntent, setExitIntent] = useState(false);
   const [promptDismissed, setPromptDismissed] = useState(false);
+  const [micDenied, setMicDenied] = useState(false);
+  const [interruption, setInterruption] = useState<InterruptionKind | null>(null);
 
   useEffect(() => {
     fetchCharacterInfo().then(setCharacterInfo);
     createClient()
       .auth.getUser()
       .then(({ data: { user } }) => setIsAnonymous(Boolean(user?.is_anonymous)));
+  }, []);
+
+  useEffect(() => {
+    // Proactive one-time check (Masterdoc §6: "block entry entirely... no
+    // text-chat fallback") — release the stream immediately, the actual
+    // recording buttons acquire their own fresh stream per-recording. Always
+    // resolved async (never setState synchronously in the effect body).
+    const getUserMedia = navigator.mediaDevices?.getUserMedia?.bind(
+      navigator.mediaDevices
+    );
+    if (!getUserMedia) {
+      Promise.resolve().then(() => setMicDenied(true));
+      return;
+    }
+    getUserMedia({ audio: true })
+      .then((stream) => stream.getTracks().forEach((t) => t.stop()))
+      .catch(() => setMicDenied(true));
   }, []);
 
   useEffect(() => {
@@ -74,7 +120,7 @@ export function VoiceLab() {
     (exitIntent || playerTurns >= SAVE_PROMPT_TURN_THRESHOLD);
 
   async function handleAudioReady(blob: Blob) {
-    if (busy || !audioEl || characterInfo?.ended) return;
+    if (busy || !audioEl || characterInfo?.ended || interruption) return;
     setBusy(true);
     const turn = messagesRef.current.filter((m) => m.role === "user").length + 1;
     const latency: TurnLatency = {
@@ -92,31 +138,56 @@ export function VoiceLab() {
       const ext = blob.type.includes("webm") ? "webm" : "wav";
       form.append("audio", blob, `speech.${ext}`);
 
-      const sttRes = await fetch("/api/voice/transcribe", {
+      let transcript: string;
+      const sttStart = performance.now();
+      const sttResult = await fetchClassified("/api/voice/transcribe", {
         method: "POST",
         body: form,
       });
-      const sttData = (await sttRes.json()) as { text?: string; ms?: number; error?: string };
-      latency.sttMs = sttData.ms ?? null;
 
-      if (!sttData.text || !sttData.text.trim()) {
-        setStatus("Heard nothing — try again.");
-        return;
+      if (typeof sttResult === "string") {
+        // Groq's whisper call failed — fall back to the browser's own
+        // speech recognition (re-listens live, can't replay the blob).
+        if (!isWebSpeechSTTAvailable()) {
+          setInterruption(sttResult);
+          return;
+        }
+        try {
+          setStatus("Having trouble hearing — say that again...");
+          transcript = await transcribeViaWebSpeech();
+        } catch {
+          setInterruption(sttResult);
+          return;
+        }
+      } else {
+        const sttData = (await sttResult.json()) as { text?: string; ms?: number };
+        latency.sttMs = sttData.ms ?? Math.round(performance.now() - sttStart);
+        if (!sttData.text || !sttData.text.trim()) {
+          setStatus("Heard nothing — try again.");
+          return;
+        }
+        transcript = sttData.text;
       }
 
-      const userMessage: ConversationMessage = { role: "user", content: sttData.text };
+      const userMessage: ConversationMessage = { role: "user", content: transcript };
       messagesRef.current = [...messagesRef.current, userMessage];
       setMessages(messagesRef.current);
 
       setStatus("Waiting for reply...");
       const chatStart = performance.now();
-      const chatRes = await fetch("/api/voice/chat", {
+      const chatResult = await fetchClassified("/api/voice/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: messagesRef.current }),
       });
 
-      const reader = chatRes.body?.getReader();
+      if (typeof chatResult === "string") {
+        // Nothing can substitute for the LLM itself — always hard-blocks.
+        setInterruption(chatResult);
+        return;
+      }
+
+      const reader = chatResult.body?.getReader();
       const decoder = new TextDecoder();
       let replyText = "";
 
@@ -144,7 +215,20 @@ export function VoiceLab() {
       const ttsChunks = chunkForTTS(replyText);
       latency.ttsChunkCount = ttsChunks.length;
       const ttsStart = performance.now();
-      await playChunksSequentially(audioEl, ttsChunks, () => {});
+      try {
+        await playChunksSequentially(audioEl, ttsChunks, () => {});
+      } catch (error) {
+        // Orpheus failed — the reply text is already known and already
+        // moderated, so speak it via the browser directly rather than
+        // re-chunking (SpeechSynthesisUtterance has no 200-char limit).
+        const kind = error instanceof TTSRequestError ? error.kind : "outage";
+        try {
+          await speakViaWebSpeech(replyText);
+        } catch {
+          setInterruption(kind);
+          return;
+        }
+      }
       latency.ttsTotalMs = Math.round(performance.now() - ttsStart);
 
       setStatus(`${name}: ${replyText}`);
@@ -161,9 +245,13 @@ export function VoiceLab() {
     }
   }
 
+  if (micDenied) {
+    return <MicBlockedScreen />;
+  }
+
   return (
     <div style={{ fontFamily: "monospace", padding: 24, maxWidth: 800 }}>
-      <h1>Voice Lab (Phase 5 — persistence & memory, plain dev chrome by design)</h1>
+      <h1>Voice Lab (Phase 6 — safety, moderation & failure states, plain dev chrome by design)</h1>
 
       <div style={{ position: "relative", width: "100%", height: 480, background: "#1a0e12" }}>
         <AvatarCanvas audio={audioEl} onStatusChange={setModelStatus} />
@@ -202,8 +290,8 @@ export function VoiceLab() {
         </p>
       ) : (
         <div style={{ display: "flex", gap: 12, margin: "16px 0" }}>
-          <PushToTalkButton disabled={busy} onAudioReady={handleAudioReady} />
-          <OpenMicToggle disabled={busy} onAudioReady={handleAudioReady} />
+          <PushToTalkButton disabled={busy || !!interruption} onAudioReady={handleAudioReady} />
+          <OpenMicToggle disabled={busy || !!interruption} onAudioReady={handleAudioReady} />
         </div>
       )}
 
@@ -224,6 +312,10 @@ export function VoiceLab() {
           characterName={name}
           onDismiss={() => setPromptDismissed(true)}
         />
+      )}
+
+      {interruption && (
+        <InterruptionOverlay kind={interruption} onRetry={() => setInterruption(null)} />
       )}
     </div>
   );

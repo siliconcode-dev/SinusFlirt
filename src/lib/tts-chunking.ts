@@ -1,11 +1,6 @@
-const MAX_CHUNK_LENGTH = 200; // Orpheus TTS hard limit on `input` length.
+import { splitSentences } from "./sentence-split";
 
-// Splits on sentence-ending punctuation, keeping the punctuation with the
-// sentence it closes.
-function splitSentences(text: string): string[] {
-  const matches = text.match(/[^.!?]+[.!?]+(\s+|$)|[^.!?]+$/g);
-  return (matches ?? [text]).map((s) => s.trim()).filter(Boolean);
-}
+const MAX_CHUNK_LENGTH = 200; // Orpheus TTS hard limit on `input` length.
 
 // Hard-cuts a single sentence that's still too long, breaking on word
 // boundaries so we never split mid-word.
