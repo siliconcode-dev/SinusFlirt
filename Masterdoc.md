@@ -196,8 +196,13 @@ writing rather than a fully unique voice each.
   - **Personification / characterization permission** — whether another entity
     (our LLM) is allowed to "perform as" this character. Required: yes.
   - **Commercial use** — VRoid Hub explicitly defines commercial use to include
-    *advertising*, which this app has from day one via AdSense. Required: yes
-    (both individual and corporate, to be safe).
+    *advertising*, which this app has from day one via AdSense. Required: yes.
+    **Staged requirement, decided 2026-09-07**: during the closed, friends-only
+    beta, **individual commercial use: Allow is sufficient** — corporate use
+    may be Disallow. Before any wider/public launch, this reverts to requiring
+    **both individual and corporate: Allow**, and every beta-sourced model
+    must be re-checked (or replaced) against that stricter bar at that point.
+    Don't let this exception silently carry forward past beta.
   Do not select a model on appearance alone — filter for both flags first, then
   choose from what's left.
 - Visual direction overall: **bright, convention-anime aesthetic** — not moody
