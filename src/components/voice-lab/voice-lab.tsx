@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PushToTalkButton } from "./push-to-talk-button";
 import { OpenMicToggle } from "./open-mic-toggle";
 import { LatencyPanel } from "./latency-panel";
@@ -15,6 +15,19 @@ const AvatarCanvas = dynamic(
   { ssr: false }
 );
 
+type CharacterInfo = {
+  name: string;
+  slug: string;
+  interestScore: number;
+  ended: boolean;
+};
+
+async function fetchCharacterInfo(): Promise<CharacterInfo | null> {
+  const res = await fetch("/api/character/me");
+  if (!res.ok) return null;
+  return (await res.json()) as CharacterInfo;
+}
+
 export function VoiceLab() {
   const messagesRef = useRef<ConversationMessage[]>([]);
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
@@ -27,9 +40,16 @@ export function VoiceLab() {
   const [modelStatus, setModelStatus] = useState<"loading" | "loaded" | "error">(
     "loading"
   );
+  const [characterInfo, setCharacterInfo] = useState<CharacterInfo | null>(null);
+
+  useEffect(() => {
+    fetchCharacterInfo().then(setCharacterInfo);
+  }, []);
+
+  const name = characterInfo?.name ?? "...";
 
   async function handleAudioReady(blob: Blob) {
-    if (busy || !audioEl) return;
+    if (busy || !audioEl || characterInfo?.ended) return;
     setBusy(true);
     const turn = messagesRef.current.filter((m) => m.role === "user").length + 1;
     const latency: TurnLatency = {
@@ -83,7 +103,7 @@ export function VoiceLab() {
             latency.llmTtftMs = Math.round(performance.now() - chatStart);
           }
           replyText += decoder.decode(value, { stream: true });
-          setStatus(`Aiko: ${replyText}`);
+          setStatus(`${name}: ${replyText}`);
         }
       }
       latency.llmTotalMs = Math.round(performance.now() - chatStart);
@@ -95,14 +115,18 @@ export function VoiceLab() {
       messagesRef.current = [...messagesRef.current, assistantMessage];
       setMessages(messagesRef.current);
 
-      setStatus(`Aiko: ${replyText} (speaking...)`);
+      setStatus(`${name}: ${replyText} (speaking...)`);
       const ttsChunks = chunkForTTS(replyText);
       latency.ttsChunkCount = ttsChunks.length;
       const ttsStart = performance.now();
       await playChunksSequentially(audioEl, ttsChunks, () => {});
       latency.ttsTotalMs = Math.round(performance.now() - ttsStart);
 
-      setStatus(`Aiko: ${replyText}`);
+      setStatus(`${name}: ${replyText}`);
+
+      // Refresh the always-visible meter (scored server-side, see
+      // /api/voice/chat's after()-scheduled scoreTurn call).
+      fetchCharacterInfo().then(setCharacterInfo);
     } catch (error) {
       console.error("[voice-lab] turn failed:", error);
       setStatus("Something went wrong — check the console.");
@@ -114,7 +138,7 @@ export function VoiceLab() {
 
   return (
     <div style={{ fontFamily: "monospace", padding: 24, maxWidth: 800 }}>
-      <h1>Voice Lab (Phase 3 — avatar + lip sync, plain dev chrome by design)</h1>
+      <h1>Voice Lab (Phase 4 — character system, plain dev chrome by design)</h1>
 
       <div style={{ position: "relative", width: "100%", height: 480, background: "#1a0e12" }}>
         <AvatarCanvas audio={audioEl} onStatusChange={setModelStatus} />
@@ -138,12 +162,24 @@ export function VoiceLab() {
         )}
       </div>
 
+      <p>
+        Character: <strong>{name}</strong> | Interest:{" "}
+        <strong>{characterInfo?.interestScore ?? "..."}/100</strong>
+      </p>
       <p>Status: {status}</p>
 
-      <div style={{ display: "flex", gap: 12, margin: "16px 0" }}>
-        <PushToTalkButton disabled={busy} onAudioReady={handleAudioReady} />
-        <OpenMicToggle disabled={busy} onAudioReady={handleAudioReady} />
-      </div>
+      {characterInfo?.ended ? (
+        <p style={{ color: "#c00", fontWeight: "bold" }}>
+          {name} has ended this conversation — her interest bottomed out.
+          Reload to try again; the score persists and can climb back up over
+          time with better conversation.
+        </p>
+      ) : (
+        <div style={{ display: "flex", gap: 12, margin: "16px 0" }}>
+          <PushToTalkButton disabled={busy} onAudioReady={handleAudioReady} />
+          <OpenMicToggle disabled={busy} onAudioReady={handleAudioReady} />
+        </div>
+      )}
 
       <h2>Conversation</h2>
       <ul>

@@ -1,17 +1,59 @@
+import { NextResponse } from "next/server";
+import { after } from "next/server";
 import { withGroqFallback, GROQ_MODELS } from "@/lib/groq";
-import { AIKO } from "@/lib/characters/aiko";
+import { createClient } from "@/lib/supabase/server";
+import { getAssignedCharacter } from "@/lib/characters/get-assigned-character";
+import { getToneDirective } from "@/lib/characters/tone";
+import { scoreTurn } from "@/lib/characters/score-turn";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
 export async function POST(request: Request) {
   const { messages } = (await request.json()) as { messages: ChatMessage[] };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "No session." }, { status: 401 });
+  }
+
+  const assigned = await getAssignedCharacter(supabase, user.id);
+  if (!assigned) {
+    return NextResponse.json(
+      { error: "Could not resolve assigned character." },
+      { status: 500 }
+    );
+  }
+  const { character, interestScore } = assigned;
+
+  // Scoring only depends on the player's message, already fully available
+  // here — no need to wait for her reply to finish streaming. `after()`
+  // keeps the serverless function alive for this after the response below
+  // is sent, run concurrently with TTS so it never adds perceived latency
+  // (same trick as Phase 3's chunk prefetching).
+  const lastUserMessage = [...messages].reverse().find((m) => m.role === "user");
+  if (lastUserMessage) {
+    after(() =>
+      scoreTurn(supabase, user.id, character, interestScore, lastUserMessage.content)
+    );
+  }
+
   const start = performance.now();
   let firstTokenMs: number | null = null;
 
   const stream = await withGroqFallback((client) =>
     client.chat.completions.create({
       model: GROQ_MODELS.chat,
-      messages: [{ role: "system", content: AIKO.systemPrompt }, ...messages],
+      messages: [
+        {
+          role: "system",
+          content: character.systemPrompt + getToneDirective(interestScore),
+        },
+        ...messages,
+      ],
       stream: true,
     })
   );

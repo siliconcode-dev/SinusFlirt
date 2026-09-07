@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { withGroqFallback, GROQ_MODELS } from "@/lib/groq";
-import { AIKO } from "@/lib/characters/aiko";
+import { createClient } from "@/lib/supabase/server";
+import { getAssignedCharacter } from "@/lib/characters/get-assigned-character";
 
 export async function POST(request: Request) {
   const { text } = (await request.json()) as { text: string };
@@ -12,13 +13,30 @@ export async function POST(request: Request) {
     );
   }
 
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "No session." }, { status: 401 });
+  }
+
+  const assigned = await getAssignedCharacter(supabase, user.id);
+  if (!assigned) {
+    return NextResponse.json(
+      { error: "Could not resolve assigned character." },
+      { status: 500 }
+    );
+  }
+
   const start = performance.now();
 
   try {
     const response = await withGroqFallback((client) =>
       client.audio.speech.create({
         model: GROQ_MODELS.tts,
-        voice: AIKO.voiceId,
+        voice: assigned.character.voiceId,
         input: text,
         response_format: "wav",
       })
