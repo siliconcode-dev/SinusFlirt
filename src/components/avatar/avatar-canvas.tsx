@@ -4,17 +4,23 @@ import { Canvas } from "@react-three/fiber";
 import { VrmAvatar } from "./vrm-avatar";
 import { CameraDrift } from "./camera-drift";
 
-const MODEL_URL = "/models/aiko.vrm";
+const DEFAULT_MODEL_URL = "/models/aiko.vrm";
 
 export function AvatarCanvas({
+  modelUrl,
   audio,
   audioContext,
   interestScore = null,
+  gestureIntensity = 1,
+  isPlayerSpeaking = false,
   onStatusChange,
 }: {
+  modelUrl?: string | null;
   audio: HTMLAudioElement | null;
   audioContext: AudioContext | null;
   interestScore?: number | null;
+  gestureIntensity?: number;
+  isPlayerSpeaking?: boolean;
   onStatusChange?: (status: "loading" | "loaded" | "error") => void;
 }) {
   return (
@@ -33,10 +39,12 @@ export function AvatarCanvas({
 
       <CameraDrift />
       <VrmAvatar
-        url={MODEL_URL}
+        url={modelUrl ?? DEFAULT_MODEL_URL}
         audio={audio}
         audioContext={audioContext}
         interestScore={interestScore}
+        gestureIntensity={gestureIntensity}
+        isPlayerSpeaking={isPlayerSpeaking}
         onStatusChange={onStatusChange}
       />
     </Canvas>

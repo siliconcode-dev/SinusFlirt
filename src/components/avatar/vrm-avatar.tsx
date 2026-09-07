@@ -6,6 +6,9 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { VRMLoaderPlugin, VRMUtils, type VRM } from "@pixiv/three-vrm";
 import { useIdleAnimation } from "./use-idle-animation";
 import { useBodyGesture } from "./use-body-gesture";
+import { useIdleFidget } from "./use-idle-fidget";
+import { useSpeakingGesture } from "./use-speaking-gesture";
+import { useListeningGesture } from "./use-listening-gesture";
 import { useLipSync } from "./use-lip-sync";
 
 export function VrmAvatar({
@@ -13,12 +16,16 @@ export function VrmAvatar({
   audio,
   audioContext,
   interestScore = null,
+  gestureIntensity = 1,
+  isPlayerSpeaking = false,
   onStatusChange,
 }: {
   url: string;
   audio: HTMLAudioElement | null;
   audioContext: AudioContext | null;
   interestScore?: number | null;
+  gestureIntensity?: number;
+  isPlayerSpeaking?: boolean;
   onStatusChange?: (status: "loading" | "loaded" | "error") => void;
 }) {
   const [vrm, setVrm] = useState<VRM | null>(null);
@@ -60,8 +67,13 @@ export function VrmAvatar({
     };
   }, [url, onStatusChange]);
 
+  // Call order matters: each hook below is additive on top of the previous
+  // frame's writes from the ones before it (see each hook's own comment).
   useIdleAnimation(vrm);
-  useBodyGesture(vrm, interestScore);
+  useBodyGesture(vrm, interestScore, gestureIntensity);
+  useIdleFidget(vrm, gestureIntensity);
+  useSpeakingGesture(vrm, audio, gestureIntensity);
+  useListeningGesture(vrm, isPlayerSpeaking, gestureIntensity);
   useLipSync(vrm, audio, audioContext);
 
   useFrame((_, delta) => {

@@ -5,7 +5,7 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { VRMLoaderPlugin, VRMUtils, VRMHumanBoneName, type VRM } from "@pixiv/three-vrm";
 
-const HER_MODEL_URL = "/models/aiko.vrm"; // shared placeholder — see Phase 7 plan
+const DEFAULT_HER_MODEL_URL = "/models/aiko.vrm";
 const PLAYER_MODEL_URL = "/models/player.vrm"; // license-checked candidate, once picked
 const SFX_URL = "/audio/kiss.mp3"; // not sourced yet — see Phase 7 plan "out of scope"
 const LEAN_DURATION_S = 1.5;
@@ -74,15 +74,17 @@ function LeaningAvatar({ vrm, side }: { vrm: VRM | null; side: "left" | "right" 
 }
 
 export function KissCutscene({
+  herModelUrl,
   reactionLine,
   onComplete,
 }: {
+  herModelUrl?: string | null;
   reactionLine: string;
   onComplete: () => void;
 }) {
   const [playerAvailable, setPlayerAvailable] = useState(true);
   const [flash, setFlash] = useState(false);
-  const herVrm = useLoadVrm(HER_MODEL_URL);
+  const herVrm = useLoadVrm(herModelUrl ?? DEFAULT_HER_MODEL_URL);
   const playerVrm = useLoadVrm(PLAYER_MODEL_URL, () => setPlayerAvailable(false));
 
   useEffect(() => {

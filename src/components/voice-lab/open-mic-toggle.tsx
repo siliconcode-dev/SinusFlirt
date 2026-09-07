@@ -15,10 +15,12 @@ export function OpenMicToggle({
   disabled,
   audioContext,
   onAudioReady,
+  onSpeakingChange,
 }: {
   disabled?: boolean;
   audioContext?: AudioContext | null;
   onAudioReady: (blob: Blob) => void;
+  onSpeakingChange?: (speaking: boolean) => void;
 }) {
   const [active, setActive] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -35,9 +37,16 @@ export function OpenMicToggle({
       const vad = await MicVAD.new({
         baseAssetPath: VAD_BASE,
         onnxWASMBasePath: ORT_WASM_BASE,
+        onSpeechStart: () => {
+          onSpeakingChange?.(true);
+        },
         onSpeechEnd: (samples: Float32Array) => {
+          onSpeakingChange?.(false);
           const blob = encodeWav(samples, 16000);
           onAudioReady(blob);
+        },
+        onVADMisfire: () => {
+          onSpeakingChange?.(false);
         },
       });
       vad.start();
@@ -54,6 +63,7 @@ export function OpenMicToggle({
     vadRef.current?.destroy();
     vadRef.current = null;
     setActive(false);
+    onSpeakingChange?.(false);
   }
 
   return (

@@ -9,10 +9,12 @@ export function PushToTalkButton({
   disabled,
   audioContext,
   onAudioReady,
+  onSpeakingChange,
 }: {
   disabled?: boolean;
   audioContext?: AudioContext | null;
   onAudioReady: (blob: Blob) => void;
+  onSpeakingChange?: (speaking: boolean) => void;
 }) {
   const [recording, setRecording] = useState(false);
   const streamRef = useRef<MediaStream | null>(null);
@@ -46,12 +48,14 @@ export function PushToTalkButton({
     recorder.start();
     recorderRef.current = recorder;
     setRecording(true);
+    onSpeakingChange?.(true);
   }
 
   function stop() {
     if (!recording) return;
     recorderRef.current?.stop();
     setRecording(false);
+    onSpeakingChange?.(false);
   }
 
   return (

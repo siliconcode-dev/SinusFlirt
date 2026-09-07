@@ -58,6 +58,8 @@ const AvatarCanvas = dynamic(
 type CharacterInfo = {
   name: string;
   slug: string;
+  modelUrl: string;
+  gestureIntensity: number;
   interestScore: number;
   memorySummary: string | null;
   ended: boolean;
@@ -107,6 +109,7 @@ export function VoiceLab() {
     typeof window !== "undefined" ? window.matchMedia(MOBILE_QUERY).matches : false
   );
   const [showKissCutscene, setShowKissCutscene] = useState(false);
+  const [isPlayerSpeaking, setIsPlayerSpeaking] = useState(false);
   const avatarCardRef = useRef<HTMLDivElement>(null);
   const statusCardRef = useRef<HTMLDivElement>(null);
 
@@ -311,6 +314,18 @@ export function VoiceLab() {
     }
   }
 
+  async function handleSelectCharacter(slug: string) {
+    const res = await fetch("/api/character/select", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slug }),
+    });
+    if (res.ok) {
+      handleEndConversation();
+      fetchCharacterInfo().then(setCharacterInfo);
+    }
+  }
+
   if (micDenied) {
     return <MicBlockedScreen />;
   }
@@ -346,7 +361,11 @@ export function VoiceLab() {
             </div>
           )}
         </div>
-        <LeaveResetMenu onEndConversation={handleEndConversation} onReset={handleReset} />
+        <LeaveResetMenu
+          onEndConversation={handleEndConversation}
+          onReset={handleReset}
+          onSelectCharacter={handleSelectCharacter}
+        />
       </div>
 
       <div
@@ -354,9 +373,12 @@ export function VoiceLab() {
         className="relative aspect-[4/5] w-full overflow-hidden rounded-2xl bg-[#1a0e12] ring-1 ring-foreground/10"
       >
         <AvatarCanvas
+          modelUrl={characterInfo?.modelUrl}
           audio={audioEl}
           audioContext={audioContext}
           interestScore={characterInfo?.interestScore ?? null}
+          gestureIntensity={characterInfo?.gestureIntensity ?? 1}
+          isPlayerSpeaking={isPlayerSpeaking}
           onStatusChange={setModelStatus}
         />
         {modelStatus !== "loaded" && (
@@ -414,12 +436,14 @@ export function VoiceLab() {
               disabled={busy || !!interruption}
               audioContext={audioContext}
               onAudioReady={handleAudioReady}
+              onSpeakingChange={setIsPlayerSpeaking}
             />
             {!isMobile && (
               <OpenMicToggle
                 disabled={busy || !!interruption}
                 audioContext={audioContext}
                 onAudioReady={handleAudioReady}
+                onSpeakingChange={setIsPlayerSpeaking}
               />
             )}
           </div>
@@ -449,6 +473,7 @@ export function VoiceLab() {
 
       {showKissCutscene && characterInfo && (
         <KissCutscene
+          herModelUrl={characterInfo.modelUrl}
           reactionLine={getKissLine(characterInfo.slug)}
           onComplete={() => setShowKissCutscene(false)}
         />

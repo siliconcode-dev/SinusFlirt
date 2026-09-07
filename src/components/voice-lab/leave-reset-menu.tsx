@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { MoreVertical, LogOut, RotateCcw } from "lucide-react";
+import { MoreVertical, LogOut, RotateCcw, Users } from "lucide-react";
+import { CharacterPickerDialog } from "./character-picker-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -22,12 +23,15 @@ import {
 export function LeaveResetMenu({
   onEndConversation,
   onReset,
+  onSelectCharacter,
 }: {
   onEndConversation: () => void;
   onReset: () => Promise<void> | void;
+  onSelectCharacter: (slug: string) => Promise<void> | void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [resetting, setResetting] = useState(false);
 
   async function handleConfirmReset() {
@@ -56,13 +60,13 @@ export function LeaveResetMenu({
         <PopoverContent align="end" className="w-64">
           <Button
             variant="ghost"
-            className="h-auto justify-start gap-2.5 py-2.5"
+            className="h-auto w-full items-start justify-start gap-2.5 py-2.5 text-left"
             onClick={() => {
               onEndConversation();
               setMenuOpen(false);
             }}
           >
-            <LogOut className="size-4" />
+            <LogOut className="mt-0.5 size-4 shrink-0" />
             <span className="flex flex-col items-start">
               <span>End conversation</span>
               <span className="text-xs font-normal text-muted-foreground">
@@ -72,13 +76,29 @@ export function LeaveResetMenu({
           </Button>
           <Button
             variant="ghost"
-            className="h-auto justify-start gap-2.5 py-2.5 text-destructive hover:text-destructive"
+            className="h-auto w-full items-start justify-start gap-2.5 py-2.5 text-left"
+            onClick={() => {
+              setMenuOpen(false);
+              setPickerOpen(true);
+            }}
+          >
+            <Users className="mt-0.5 size-4 shrink-0" />
+            <span className="flex flex-col items-start">
+              <span>Choose a companion</span>
+              <span className="text-xs font-normal text-muted-foreground">
+                Pick from the free roster, starts that relationship fresh
+              </span>
+            </span>
+          </Button>
+          <Button
+            variant="ghost"
+            className="h-auto w-full items-start justify-start gap-2.5 py-2.5 text-left text-destructive hover:text-destructive"
             onClick={() => {
               setMenuOpen(false);
               setConfirmOpen(true);
             }}
           >
-            <RotateCcw className="size-4" />
+            <RotateCcw className="mt-0.5 size-4 shrink-0" />
             <span className="flex flex-col items-start">
               <span>Restart relationship fresh</span>
               <span className="text-xs font-normal text-muted-foreground">
@@ -88,6 +108,12 @@ export function LeaveResetMenu({
           </Button>
         </PopoverContent>
       </Popover>
+
+      <CharacterPickerDialog
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        onSelect={onSelectCharacter}
+      />
 
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <DialogContent>

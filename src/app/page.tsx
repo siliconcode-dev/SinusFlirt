@@ -6,8 +6,15 @@ import { Button } from "@/components/ui/button";
 import { AdsterraNativeBanner } from "@/components/ads/adsterra-native-banner";
 import { AdsterraSocialBar } from "@/components/ads/adsterra-social-bar";
 import { AdsterraBanner300x250 } from "@/components/ads/adsterra-banner-300x250";
+import { createClient } from "@/lib/supabase/server";
 
-export default function Home() {
+export default async function Home() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const isAnonymous = user?.is_anonymous ?? true;
+
   return (
     <main className="relative flex min-h-[100dvh] flex-col items-center justify-center px-4 py-16 text-center">
       <AmbientBackground />
@@ -20,17 +27,23 @@ export default function Home() {
           You&apos;re in.
         </h1>
         <p className="mt-4 text-base text-muted-foreground">
-          Your anonymous session is live and your companion is waiting.
+          {isAnonymous
+            ? "Your anonymous session is live and your companion is waiting."
+            : "You're signed in — your progress is saved."}
         </p>
         <div className="mt-8 flex flex-col items-center gap-4">
           <Button asChild size="lg">
             <Link href="/voice-lab">Start talking</Link>
           </Button>
-          <GoogleSignInButton />
-          <p className="text-xs text-muted-foreground">
-            Sign-in is optional — without it, your session is remembered for
-            48 hours only.
-          </p>
+          {isAnonymous && (
+            <>
+              <GoogleSignInButton />
+              <p className="text-xs text-muted-foreground">
+                Sign-in is optional — without it, your session is remembered
+                for 48 hours only.
+              </p>
+            </>
+          )}
         </div>
         <div className="mt-10">
           <AdsterraNativeBanner />

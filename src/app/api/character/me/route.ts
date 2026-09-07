@@ -28,6 +28,8 @@ export async function GET() {
   return NextResponse.json({
     name: assigned.character.name,
     slug: assigned.character.slug,
+    modelUrl: assigned.character.modelUrl,
+    gestureIntensity: assigned.character.gestureIntensity,
     interestScore: assigned.interestScore,
     memorySummary: assigned.memorySummary,
     ended: assigned.interestScore <= EARLY_EXIT_THRESHOLD,
