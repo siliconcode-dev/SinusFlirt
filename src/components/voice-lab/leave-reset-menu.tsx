@@ -57,7 +57,7 @@ export function LeaveResetMenu({
             <MoreVertical />
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="end" className="w-64">
+        <PopoverContent align="end" className="w-64 max-w-[calc(100vw-2rem)]">
           <Button
             variant="ghost"
             className="h-auto w-full items-start justify-start gap-2.5 py-2.5 text-left"
@@ -67,9 +67,9 @@ export function LeaveResetMenu({
             }}
           >
             <LogOut className="mt-0.5 size-4 shrink-0" />
-            <span className="flex flex-col items-start">
+            <span className="flex min-w-0 flex-1 flex-col items-start whitespace-normal">
               <span>End conversation</span>
-              <span className="text-xs font-normal text-muted-foreground">
+              <span className="whitespace-normal text-xs font-normal text-muted-foreground">
                 Clears the chat log, she remembers everything
               </span>
             </span>
@@ -83,9 +83,9 @@ export function LeaveResetMenu({
             }}
           >
             <Users className="mt-0.5 size-4 shrink-0" />
-            <span className="flex flex-col items-start">
+            <span className="flex min-w-0 flex-1 flex-col items-start whitespace-normal">
               <span>Choose a companion</span>
-              <span className="text-xs font-normal text-muted-foreground">
+              <span className="whitespace-normal text-xs font-normal text-muted-foreground">
                 Pick from the free roster, starts that relationship fresh
               </span>
             </span>
@@ -99,9 +99,9 @@ export function LeaveResetMenu({
             }}
           >
             <RotateCcw className="mt-0.5 size-4 shrink-0" />
-            <span className="flex flex-col items-start">
+            <span className="flex min-w-0 flex-1 flex-col items-start whitespace-normal">
               <span>Restart relationship fresh</span>
-              <span className="text-xs font-normal text-muted-foreground">
+              <span className="whitespace-normal text-xs font-normal text-muted-foreground">
                 Starts over completely, possibly with someone new
               </span>
             </span>
