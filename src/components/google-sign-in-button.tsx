@@ -13,6 +13,13 @@ export function GoogleSignInButton() {
     setLoading(true);
     setError(null);
     const supabase = createClient();
+    // Supabase's redirectTo must exactly match an allowlisted URL (query
+    // strings aren't supported there), so "return to wherever sign-in was
+    // triggered from" goes through a short-lived cookie instead — read and
+    // cleared by /auth/callback.
+    document.cookie = `post_auth_redirect=${encodeURIComponent(
+      window.location.pathname + window.location.search
+    )}; path=/; max-age=600; SameSite=Lax`;
     const redirectTo = `${window.location.origin}/auth/callback`;
 
     const {
