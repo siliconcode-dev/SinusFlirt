@@ -39,9 +39,14 @@ export function useIdleFidget(vrm: VRM | null, gestureIntensity = 1) {
     const humanoid = vrm.humanoid;
     if (!humanoid) return;
 
+    // Chest.z and (below) UpperArm.x are owned exclusively by this hook —
+    // nothing upstream resets them each frame, so these MUST be absolute
+    // assignments. Using += here previously accumulated the sine value
+    // every single frame with no baseline reset — not bounded oscillation,
+    // genuine unbounded drift (the "spinning arms" bug).
     const chest = humanoid.getNormalizedBoneNode(VRMHumanBoneName.Chest);
     if (chest) {
-      chest.rotation.z +=
+      chest.rotation.z =
         Math.sin((clock.current / WEIGHT_SHIFT_PERIOD_S) * Math.PI * 2) *
         WEIGHT_SHIFT_AMPLITUDE *
         gestureIntensity;
@@ -71,7 +76,9 @@ export function useIdleFidget(vrm: VRM | null, gestureIntensity = 1) {
           : 1;
 
     const rightUpperArm = humanoid.getNormalizedBoneNode(VRMHumanBoneName.RightUpperArm);
-    if (rightUpperArm) rightUpperArm.rotation.x -= envelope * 0.5 * gestureIntensity;
+    if (rightUpperArm) rightUpperArm.rotation.x = -envelope * 0.5 * gestureIntensity;
+    // RightLowerArm.y IS reset fresh every frame by useBodyGesture (which
+    // runs before this hook) — additive here is safe, not an accumulator.
     const rightLowerArm = humanoid.getNormalizedBoneNode(VRMHumanBoneName.RightLowerArm);
     if (rightLowerArm) rightLowerArm.rotation.y -= envelope * 0.6 * gestureIntensity;
 

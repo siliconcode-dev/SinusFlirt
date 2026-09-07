@@ -47,15 +47,21 @@ export async function POST(request: Request) {
   // her *previous* reply — both already fully available here (the client
   // resends full history every turn, so the prior assistant turn is already
   // in `messages`) — no need to wait for this turn's reply to finish
-  // streaming. `after()` keeps the serverless function alive for this after
-  // the response below is sent, run concurrently with TTS so it never adds
-  // perceived latency (same trick as Phase 3's chunk prefetching).
+  // streaming before *starting* this. Kicked off as a real promise (not
+  // after()) and awaited in the stream's finally block below, right before
+  // controller.close() — that guarantees the DB write lands before the
+  // client's reader loop resolves done:true, which is what the client's
+  // post-turn fetchCharacterInfo() call depends on. Backgrounding this via
+  // after() let the client's refetch race the scoring call and read a stale
+  // (pre-update) score, so a player could keep talking to a character whose
+  // score had already dropped below EARLY_EXIT_THRESHOLD. Still runs
+  // concurrently with reply-token streaming, so it adds no perceived latency
+  // in the common case where scoring finishes before the reply text does.
   const lastUserMessage = [...messages].reverse().find((m) => m.role === "user");
   const previousAssistantMessage =
     [...messages].reverse().find((m) => m.role === "assistant")?.content ?? null;
-  if (lastUserMessage) {
-    after(() =>
-      scoreTurn(
+  const scoringPromise = lastUserMessage
+    ? scoreTurn(
         supabase,
         user.id,
         characterId,
@@ -65,8 +71,7 @@ export async function POST(request: Request) {
         lastUserMessage.content,
         previousAssistantMessage
       )
-    );
-  }
+    : Promise.resolve(interestScore);
   after(() => incrementUsage(supabase, user.id));
 
   const start = performance.now();
@@ -142,6 +147,11 @@ export async function POST(request: Request) {
       } catch (error) {
         console.error("[voice/chat] stream failed:", error);
       } finally {
+        // Wait for scoring's DB write here, not after — see the comment
+        // above scoringPromise's declaration for why this matters.
+        await scoringPromise.catch((error) => {
+          console.error("[voice/chat] scoreTurn failed:", error);
+        });
         const totalMs = Math.round(performance.now() - start);
         console.log(`[voice/chat] total ${totalMs}ms`);
         controller.close();

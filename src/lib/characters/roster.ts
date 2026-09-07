@@ -26,5 +26,8 @@ export const ROSTER: Record<string, Character> = {
   hana: HANA,
 };
 
-export const FREE_SLUGS = ["aiko", "mei", "sasha", "priya", "luna"];
-export const PREMIUM_SLUGS = ["freya", "nova", "elena", "coral", "hana"];
+// Rebalanced 2026-09-07: Sasha and Luna moved to premium, Nova and Freya
+// moved to free (randomly picked to backfill) — keep in sync with the
+// characters.tier column, see supabase/migrations/20260907093000_tier_swap.sql.
+export const FREE_SLUGS = ["aiko", "mei", "priya", "nova", "freya"];
+export const PREMIUM_SLUGS = ["sasha", "luna", "elena", "coral", "hana"];

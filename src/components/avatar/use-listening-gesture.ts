@@ -30,9 +30,12 @@ export function useListeningGesture(
     const head = vrm.humanoid?.getNormalizedBoneNode(VRMHumanBoneName.Head);
     if (!head) return;
 
+    // Head.x is owned exclusively by this hook (nothing upstream resets it
+    // each frame) — must be an absolute assignment, not +=, or it
+    // accumulates without bound for as long as the player keeps talking.
     const wave = Math.sin((clock.current / NOD_PERIOD_S) * Math.PI * 2);
     // Biased toward the forward nod rather than symmetric, reads as "mm-hm"
     // rather than a head-shake.
-    head.rotation.x += (wave * 0.5 + 0.5) * 0.06 * envelope.current * gestureIntensity;
+    head.rotation.x = (wave * 0.5 + 0.5) * 0.06 * envelope.current * gestureIntensity;
   });
 }

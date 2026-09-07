@@ -45,10 +45,14 @@ export function useSpeakingGesture(
     const humanoid = vrm.humanoid;
     if (!humanoid) return;
 
+    // Both axes are owned exclusively by this hook (nothing upstream resets
+    // LeftUpperArm.x or LeftLowerArm.z each frame) — must be absolute
+    // assignments, not +=/-=, or the rotation accumulates without bound
+    // for as long as she keeps talking.
     const wave = Math.sin((clock.current / GESTURE_PERIOD_S) * Math.PI * 2);
     const leftUpperArm = humanoid.getNormalizedBoneNode(VRMHumanBoneName.LeftUpperArm);
-    if (leftUpperArm) leftUpperArm.rotation.x -= wave * 0.12 * envelope.current * gestureIntensity;
+    if (leftUpperArm) leftUpperArm.rotation.x = -wave * 0.12 * envelope.current * gestureIntensity;
     const leftLowerArm = humanoid.getNormalizedBoneNode(VRMHumanBoneName.LeftLowerArm);
-    if (leftLowerArm) leftLowerArm.rotation.z -= wave * 0.18 * envelope.current * gestureIntensity;
+    if (leftLowerArm) leftLowerArm.rotation.z = -wave * 0.18 * envelope.current * gestureIntensity;
   });
 }
